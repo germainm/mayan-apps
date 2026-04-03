@@ -1,0 +1,87 @@
+{% extends "appearance/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+{% if object_list %}
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">
+          {% trans "Documents similaires" %}
+          <span class="badge">{{ object_list|length }}</span>
+        </h3>
+      </div>
+
+      <table class="table table-hover table-striped">
+        <thead>
+          <tr>
+            <th style="width: 60px;">{% trans "Score" %}</th>
+            <th>{% trans "Document" %}</th>
+            <th>{% trans "Type" %}</th>
+            <th>{% trans "Date" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in object_list %}
+          <tr>
+            <!-- Score de similarité avec barre de progression -->
+            <td>
+              <div style="text-align: center; font-weight: bold; margin-bottom: 3px;">
+                {{ doc.score_similarite }}%
+              </div>
+              <div class="progress" style="margin: 0; height: 6px;">
+                <div class="progress-bar
+                  {% if doc.score_similarite >= 75 %}progress-bar-success
+                  {% elif doc.score_similarite >= 40 %}progress-bar-warning
+                  {% else %}progress-bar-danger{% endif %}"
+                  role="progressbar"
+                  style="width: {{ doc.score_similarite }}%;">
+                </div>
+              </div>
+            </td>
+
+            <!-- Lien vers le document -->
+            <td>
+              <a href="{% url 'documents:document_preview' doc.pk %}">
+                {{ doc.label }}
+              </a>
+            </td>
+
+            <!-- Type de document -->
+            <td>
+              <span class="label label-default">
+                {{ doc.document_type.label }}
+              </span>
+            </td>
+
+            <!-- Date de création -->
+            <td>
+              {{ doc.datetime_created|date:"Y-m-d" }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- Aucun résultat -->
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+      <div class="panel-body text-center" style="padding: 40px;">
+        <span class="fa fa-copy fa-3x text-muted" style="margin-bottom: 16px; display: block;"></span>
+        <h4 class="text-muted">{{ no_results_title }}</h4>
+        <p class="text-muted">{{ no_results_text }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

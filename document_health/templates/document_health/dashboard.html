@@ -1,0 +1,147 @@
+{% extends "appearance/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">
+          <span class="fa fa-heartbeat"></span>
+          {% trans "Qualité des documents" %}
+          <span class="badge" style="margin-left:8px;">{{ total_docs }} {% trans "documents" %}</span>
+        </h3>
+      </div>
+      <div class="panel-body">
+
+        <div class="row" style="margin-bottom:20px;">
+
+          <!-- Sans type MIME -->
+          <div class="col-xs-12 col-sm-4" style="margin-bottom:12px;">
+            <a href="{% url 'document_health:no_mimetype' %}" class="text-decoration-none">
+              <div class="panel {% if count_no_mimetype > 0 %}panel-warning{% else %}panel-success{% endif %}"
+                style="margin-bottom:0; cursor:pointer;">
+                <div class="panel-heading" style="padding:12px 16px;">
+                  <div class="row">
+                    <div class="col-xs-3" style="font-size:40px; opacity:0.7;">
+                      <span class="fa fa-question-circle"></span>
+                    </div>
+                    <div class="col-xs-9 text-right">
+                      <div style="font-size:36px; font-weight:bold; line-height:1;">
+                        {{ count_no_mimetype }}
+                      </div>
+                      <div style="font-size:13px; opacity:0.9;">
+                        {% trans "Sans type MIME" %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-footer" style="font-size:12px; padding:6px 16px;">
+                  {% if count_no_mimetype > 0 %}
+                    {% trans "Cliquer pour voir la liste" %} &rarr;
+                  {% else %}
+                    <span class="fa fa-check"></span> {% trans "Aucun problème" %}
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <!-- Sans pages -->
+          <div class="col-xs-12 col-sm-4" style="margin-bottom:12px;">
+            <a href="{% url 'document_health:no_pages' %}" class="text-decoration-none">
+              <div class="panel {% if count_no_pages > 0 %}panel-danger{% else %}panel-success{% endif %}"
+                style="margin-bottom:0; cursor:pointer;">
+                <div class="panel-heading" style="padding:12px 16px;">
+                  <div class="row">
+                    <div class="col-xs-3" style="font-size:40px; opacity:0.7;">
+                      <span class="fa fa-file-o"></span>
+                    </div>
+                    <div class="col-xs-9 text-right">
+                      <div style="font-size:36px; font-weight:bold; line-height:1;">
+                        {{ count_no_pages }}
+                      </div>
+                      <div style="font-size:13px; opacity:0.9;">
+                        {% trans "Sans pages" %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-footer" style="font-size:12px; padding:6px 16px;">
+                  {% if count_no_pages > 0 %}
+                    {% trans "Cliquer pour voir la liste" %} &rarr;
+                  {% else %}
+                    <span class="fa fa-check"></span> {% trans "Aucun problème" %}
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <!-- Sans OCR -->
+          <div class="col-xs-12 col-sm-4" style="margin-bottom:12px;">
+            <a href="{% url 'document_health:no_ocr' %}" class="text-decoration-none">
+              <div class="panel {% if count_no_ocr > 0 %}panel-warning{% else %}panel-success{% endif %}"
+                style="margin-bottom:0; cursor:pointer;">
+                <div class="panel-heading" style="padding:12px 16px;">
+                  <div class="row">
+                    <div class="col-xs-3" style="font-size:40px; opacity:0.7;">
+                      <span class="fa fa-font"></span>
+                    </div>
+                    <div class="col-xs-9 text-right">
+                      <div style="font-size:36px; font-weight:bold; line-height:1;">
+                        {{ count_no_ocr }}
+                      </div>
+                      <div style="font-size:13px; opacity:0.9;">
+                        {% trans "Sans OCR" %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-footer" style="font-size:12px; padding:6px 16px;">
+                  {% if count_no_ocr > 0 %}
+                    {% trans "Cliquer pour voir la liste" %} &rarr;
+                  {% else %}
+                    <span class="fa fa-check"></span> {% trans "Aucun problème" %}
+                  {% endif %}
+                </div>
+              </div>
+            </a>
+          </div>
+
+        </div>
+
+        <!-- Barre de santé globale -->
+        {% with total=total_docs problemes=count_no_mimetype|add:count_no_pages|add:count_no_ocr %}
+        {% if total > 0 %}
+        <div style="margin-top:8px;">
+          <div style="font-size:12px; color:#888; margin-bottom:4px;">
+            {% trans "Santé globale" %} —
+            {% if problemes == 0 %}
+              <span style="color:#3c763d;">{% trans "Tous les documents sont corrects" %}</span>
+            {% else %}
+              <span style="color:#a94442;">
+                {{ problemes }} {% trans "document(s) avec problème(s)" %}
+              </span>
+            {% endif %}
+          </div>
+          <div class="progress" style="margin:0; height:8px;">
+            {% if total > 0 %}
+            {% widthratio problemes total 100 as pct_problems %}
+            <div class="progress-bar progress-bar-success"
+              style="width:{% widthratio total|add:'-'|add:problemes total 100 %}%">
+            </div>
+            <div class="progress-bar progress-bar-danger"
+              style="width:{{ pct_problems }}%">
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

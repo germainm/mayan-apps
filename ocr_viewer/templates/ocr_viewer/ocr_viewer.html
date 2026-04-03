@@ -1,0 +1,256 @@
+{% extends "appearance/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+
+      <div class="panel-heading">
+        <h3 class="panel-title">
+          <span class="fa fa-file-text"></span>
+          {% trans "Contenu OCR" %} &mdash; {{ document.label }}
+        </h3>
+      </div>
+
+      <div class="panel-body">
+        {% if ocr_content %}
+
+        <!-- Barre de recherche -->
+        <div class="form-group">
+          <div class="input-group">
+            <span class="input-group-addon">
+              <span class="fa fa-search"></span>
+            </span>
+            <input
+              type="text"
+              id="ocr-search-input"
+              class="form-control"
+              placeholder="{% trans 'Rechercher dans le texte OCR...' %}"
+              autofocus
+            />
+            <span class="input-group-btn">
+              <button class="btn btn-default" id="btn-prev"
+                title="{% trans 'Occurrence précédente (Maj+Entrée)' %}" disabled>
+                <span class="fa fa-chevron-up"></span>
+              </button>
+              <button class="btn btn-default" id="btn-next"
+                title="{% trans 'Occurrence suivante (Entrée)' %}" disabled>
+                <span class="fa fa-chevron-down"></span>
+              </button>
+              <button class="btn btn-default" id="btn-clear"
+                title="{% trans 'Effacer (Échap)' %}">
+                <span class="fa fa-times"></span>
+              </button>
+            </span>
+          </div>
+          <!-- Compteur -->
+          <div id="search-info"
+            style="margin-top:5px; font-size:12px; color:#888; min-height:16px;">
+          </div>
+        </div>
+
+        <!-- Option délimitation des pages -->
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-weight:normal; font-size:13px; color:#555; cursor:pointer;">
+            <input type="checkbox" id="chk-pages" style="margin-right:6px;">
+            {% trans "Afficher les séparateurs de pages" %}
+          </label>
+        </div>
+
+        <!-- Texte OCR -->
+        <div id="ocr-text"
+          style="
+            background:#fafafa;
+            border:1px solid #ddd;
+            border-radius:4px;
+            padding:16px 20px;
+            font-family:Georgia,'Times New Roman',serif;
+            font-size:14px;
+            line-height:1.8;
+            white-space:pre-wrap;
+            word-wrap:break-word;
+            max-height:70vh;
+            overflow-y:auto;
+            color:#222;
+          "
+        ></div>
+
+        {% else %}
+
+        <div class="text-center" style="padding:40px 20px;">
+          <span class="fa fa-file-o fa-4x text-muted"
+            style="display:block; margin-bottom:16px;"></span>
+          <h4 class="text-muted">{% trans "Aucun contenu OCR disponible" %}</h4>
+          <p class="text-muted">
+            {% trans "Ce document n'a pas encore été traité par l'OCR, ou son contenu est vide." %}
+          </p>
+        </div>
+
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% if ocr_content %}
+<style>
+  mark.ocr-hi {
+    background: #fff176;
+    color: #333;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  mark.ocr-hi.current {
+    background: #ff9800;
+    color: #fff;
+    outline: 2px solid #e65100;
+  }
+  .ocr-page-separator {
+    display: block;
+    text-align: right;
+    font-size: 11px;
+    font-family: Arial, sans-serif;
+    color: #aaa;
+    font-style: normal;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+  }
+  .ocr-page-rule {
+    display: block;
+    color: #bbb;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin: 8px 0 10px 0;
+    user-select: none;
+  }
+</style>
+
+<script>
+(function () {
+  var input     = document.getElementById('ocr-search-input');
+  var btnPrev   = document.getElementById('btn-prev');
+  var btnNext   = document.getElementById('btn-next');
+  var btnClear  = document.getElementById('btn-clear');
+  var chkPages  = document.getElementById('chk-pages');
+  var info      = document.getElementById('search-info');
+  var container = document.getElementById('ocr-text');
+
+  // Pages OCR transmises depuis Django — une entrée par page
+  var pages = {{ ocr_pages_json|safe }};
+
+  var marks   = [];
+  var current = -1;
+  var showSep = false;
+
+  // ── Construire le texte brut ou avec séparateurs ──────────────────────────
+  function buildHTML(term) {
+    var html = '';
+
+    for (var i = 0; i < pages.length; i++) {
+      var pageNum  = i + 1;
+      var pageText = pages[i];
+
+      if (showSep && pages.length > 1) {
+        if (i > 0) {
+          html += '<span class="ocr-page-rule">'
+               + '&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;'
+               + '&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;'
+               + '&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;&ndash;'
+               + '</span>';
+        }
+        html += '<span class="ocr-page-separator">{% trans "Page" %} '
+             + pageNum + '</span>';
+      }
+
+      if (term) {
+        var re = new RegExp('(' + escRe(term) + ')', 'gi');
+        html += pageText.replace(re, '<mark class="ocr-hi">$1</mark>');
+      } else {
+        html += escHtml(pageText);
+      }
+    }
+
+    return html;
+  }
+
+  function render(term) {
+    container.innerHTML = buildHTML(term || '');
+    marks   = Array.from(container.querySelectorAll('mark.ocr-hi'));
+    current = marks.length ? 0 : -1;
+    if (current === 0) goTo(0, false);
+    updateUI();
+  }
+
+  function goTo(idx, smooth) {
+    if (!marks.length) return;
+    marks.forEach(function (m) { m.classList.remove('current'); });
+    current = ((idx % marks.length) + marks.length) % marks.length;
+    marks[current].classList.add('current');
+    marks[current].scrollIntoView({
+      behavior: smooth === false ? 'auto' : 'smooth',
+      block: 'center'
+    });
+    updateUI();
+  }
+
+  function updateUI() {
+    var n = marks.length;
+    btnPrev.disabled = btnNext.disabled = (n === 0);
+    if (n === 0) {
+      info.textContent = input.value.length
+        ? '{% trans "Aucune occurrence trouvée" %}'
+        : '';
+    } else {
+      info.textContent = (current + 1) + '\u00a0/\u00a0' + n
+        + '\u00a0{% trans "occurrence(s)" %}';
+    }
+  }
+
+  function escRe(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;');
+  }
+
+  // ── Événements ────────────────────────────────────────────────────────────
+  var timer;
+  input.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () { render(input.value.trim()); }, 280);
+  });
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      goTo(e.shiftKey ? current - 1 : current + 1);
+    }
+    if (e.key === 'Escape') { input.value = ''; render(''); }
+  });
+
+  btnNext.addEventListener('click',  function () { goTo(current + 1); });
+  btnPrev.addEventListener('click',  function () { goTo(current - 1); });
+  btnClear.addEventListener('click', function () {
+    input.value = ''; render(''); input.focus();
+  });
+
+  chkPages.addEventListener('change', function () {
+    showSep = this.checked;
+    var term = input.value.trim();
+    render(term);
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  render('');
+  updateUI();
+}());
+</script>
+{% endif %}
+
+{% endblock content %}

@@ -1,0 +1,146 @@
+{% extends "appearance/base.html" %}
+{% load i18n static %}
+
+{% block content %}
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">{% trans "Filtrer par conducteur" %}</h3>
+      </div>
+      <div class="panel-body">
+        <form method="get" action="{% url 'itineraires:stats' %}">
+          <div class="form-group">
+            <label>{% trans "Conducteur" %}</label>
+            <select name="conducteur" class="form-control" onchange="this.form.submit()">
+              <option value="">{% trans "Tous" %}</option>
+              {% for c in conducteurs %}
+                <option value="{{ c }}"
+                  {% if c == conducteur_selectionne %}selected{% endif %}>
+                  {{ c }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12 col-md-6">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">{% trans "Distance par jour (30 derniers jours)" %}</h3>
+      </div>
+      <div class="panel-body">
+        <canvas id="chart-jour" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-xs-12 col-md-6">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">{% trans "Distance par semaine" %}</h3>
+      </div>
+      <div class="panel-body">
+        <canvas id="chart-semaine" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">{% trans "Distance par mois" %}</h3>
+      </div>
+      <div class="panel-body">
+        <canvas id="chart-mois" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'statistics/node_modules/chart.js/dist/chart.min.js' %}"></script>
+
+<script>
+(function() {
+    var conducteur = "{{ conducteur_selectionne|escapejs }}";
+    var params = conducteur ? "?conducteur=" + encodeURIComponent(conducteur) : "";
+    var charge = false;
+
+    function construireChart(canvasId, labels, data, labelTexte) {
+        if (!labels || labels.length === 0) return;
+        var canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: labelTexte,
+                    data: data,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'km' } }
+                }
+            }
+        });
+    }
+
+    function chargerTout() {
+        if (charge) return;
+        if (!document.getElementById('chart-jour')) return;
+        charge = true;
+
+        fetch('/api/v4/itineraires/stats/jour/' + params, {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                construireChart('chart-jour',
+                    data.map(function(d) { return d.date; }),
+                    data.map(function(d) { return parseFloat(d.total_km); }),
+                    'Distance (km)');
+            });
+
+        fetch('/api/v4/itineraires/stats/semaine/' + params, {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                construireChart('chart-semaine',
+                    data.map(function(d) { return d.semaine; }),
+                    data.map(function(d) { return parseFloat(d.total_km); }),
+                    'Distance (km)');
+            });
+
+        fetch('/api/v4/itineraires/stats/mois/' + params, {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                construireChart('chart-mois',
+                    data.map(function(d) { return d.mois; }),
+                    data.map(function(d) { return parseFloat(d.total_km); }),
+                    'Distance (km)');
+            });
+    }
+
+    // #ajax-content trigger 'updated' après chaque chargement AJAX de Mayan
+    $('#ajax-content').on('updated', function() {
+        charge = false;
+        chargerTout();
+    });
+
+    // Premier chargement — la page est déjà dans le DOM
+    chargerTout();
+})();
+</script>
+
+{% endblock content %}

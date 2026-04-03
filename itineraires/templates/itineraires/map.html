@@ -1,0 +1,94 @@
+{% extends "appearance/base.html" %}
+{% load i18n static %}
+
+{% block head_extra %}
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+{% endblock %}
+
+{% block content %}
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">
+      {% trans "Carte du trajet" %} — {{ itineraire.conducteur }}
+      ({{ itineraire.date_trajet }})
+      — {{ itineraire.distance_km }} km
+      — {{ itineraire.duree_formatee }}
+    </h3>
+  </div>
+  <div class="panel-body" style="padding: 0;">
+    <div id="carte-gpx" style="height: 500px; width: 100%;"></div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xs-12 col-md-4">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">{% trans "Détails" %}</h3>
+      </div>
+      <div class="panel-body">
+        <dl class="dl-horizontal">
+          <dt>{% trans "Conducteur" %}</dt>
+          <dd>{{ itineraire.conducteur }}</dd>
+          <dt>{% trans "Date" %}</dt>
+          <dd>{{ itineraire.date_trajet }}</dd>
+          <dt>{% trans "Distance" %}</dt>
+          <dd>{{ itineraire.distance_km }} km</dd>
+          <dt>{% trans "Durée" %}</dt>
+          <dd>{{ itineraire.duree_formatee }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<script>
+const carte = L.map('carte-gpx');
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(carte);
+
+fetch('/api/v4/itineraires/{{ itineraire.pk }}/gpx/')
+    .then(r => r.json())
+    .then(data => {
+        if (!data.points || data.points.length === 0) return;
+
+        const trace = L.polyline(data.points, {
+            color: '#2196F3',
+            weight: 4,
+            opacity: 0.8
+        }).addTo(carte);
+
+        L.marker(data.points[0], {
+            icon: L.divIcon({
+                className: '',
+                html: '<div style="background:#4CAF50;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>'
+            })
+        }).addTo(carte).bindPopup("{% trans 'Départ' %}");
+
+        const fin = data.points[data.points.length - 1];
+        L.marker(fin, {
+            icon: L.divIcon({
+                className: '',
+                html: '<div style="background:#F44336;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>'
+            })
+        }).addTo(carte).bindPopup("{% trans 'Arrivée' %}");
+
+        carte.fitBounds(trace.getBounds(), { padding: [20, 20] });
+    })
+    .catch(err => {
+        console.error('Erreur chargement GPX :', err);
+        document.getElementById('carte-gpx').innerHTML =
+            '<div class="alert alert-danger" style="margin:20px;">'
+            + "{% trans 'Impossible de charger le tracé GPX.' %}"
+            + '</div>';
+    });
+</script>
+
+{% endblock content %}
